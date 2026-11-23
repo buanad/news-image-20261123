@@ -2,7 +2,9 @@
 """make.fun entry: World news of 23 November 2026 in one image.
 
 Copies the pre-rendered poster (entry.png, 1024x1024) byte-for-byte to the
-output directory, then verifies the copy with a size + SHA-256 check.
+output directory. Before copying, it validates the PNG signature so a
+corrupt or non-PNG source file is refused instead of submitted; after
+copying, it verifies the copy with a size + SHA-256 check.
 
 Standard library only. No network access, no randomness, no clock reads:
 given the same entry.png the output is deterministic.
@@ -16,6 +18,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SOURCE = HERE / "entry.png"
+
+# PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A.
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 def sha256_of(path):
@@ -33,6 +38,15 @@ def main():
 
     expected_size = SOURCE.stat().st_size
     expected_sha = sha256_of(SOURCE)
+
+    with open(SOURCE, "rb") as handle:
+        signature = handle.read(len(PNG_SIGNATURE))
+    if signature != PNG_SIGNATURE:
+        print(
+            "invalid PNG signature: entry.png is not a PNG file",
+            file=sys.stderr,
+        )
+        return 1
 
     shutil.copyfile(SOURCE, dest)
 
